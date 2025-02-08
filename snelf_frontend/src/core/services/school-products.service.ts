@@ -33,12 +33,10 @@ export class SchoolProductsService {
 
   async consultarProdutosEscolares(
     filters: FilterType,
-    offset: number,
-    limit: number
   ): Promise<any> {
     try {
       const response = await this.axiosInstace.get(
-        `/produtos-escolares/buscar-produtos?offset=${offset}&limit=${limit}`,
+        `/produtos-escolares/buscar-produtos`,
         { params: filters }
       );
       console.log(response.data);

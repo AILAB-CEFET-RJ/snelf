@@ -1,16 +1,12 @@
-import useStore from "../../core/mobx/use-store";
-import { FilterType } from "../../types/types";
 import { Button, TextField } from "@mui/material";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
+import { FilterType } from "../../types/types";
 
-export const MedicinesFilters = () => {
-  const { medicinesStore } = useStore();
-  const {
-    setClean,
-    setDescricaoProduto,
-    setUnidadeComercial,
-    setValorUnitarioComercial,
-  } = medicinesStore;
+interface MedicinesFiltersProps {
+  onFilter: (filters: FilterType) => void;
+}
+
+export const MedicinesFilters = ({ onFilter }: MedicinesFiltersProps) => {
   const { control, handleSubmit } = useForm<FilterType>({
     defaultValues: {
       clean: "",
@@ -21,12 +17,8 @@ export const MedicinesFilters = () => {
     },
   });
 
-  const onSubmit: SubmitHandler<FilterType> = async (data) => {
-    setClean(data.clean);
-    setDescricaoProduto(data.descricaoProduto);
-    setUnidadeComercial(data.unidadeComercial);
-    setValorUnitarioComercial(data.valorUnitarioComercial);
-    await medicinesStore.loadTableRows(data);
+  const onSubmit: SubmitHandler<FilterType> = (data) => {
+    onFilter(data); // Apenas chama a função que aplica os filtros no frontend
   };
 
   return (

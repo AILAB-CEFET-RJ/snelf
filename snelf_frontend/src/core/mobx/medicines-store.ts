@@ -15,6 +15,7 @@ class MedicinesStore {
   clean: string = "";
   descricaoProduto: string = "";
   unidadeComercial: string = "";
+  quantidade: string = "";
   valorUnitarioComercial: string = "";
 
   constructor() {
@@ -30,6 +31,7 @@ class MedicinesStore {
       clean: observable,
       descricaoProduto: observable,
       unidadeComercial: observable,
+      quantidade: observable,
       valorUnitarioComercial: observable,
       setError: action,
       setLoading: action,
@@ -43,6 +45,7 @@ class MedicinesStore {
       setClean: action,
       setDescricaoProduto: action,
       setUnidadeComercial: action,
+      setQuantidade: action,
       setValorUnitarioComercial: action,
     });
 
@@ -60,6 +63,10 @@ class MedicinesStore {
   setUnidadeComercial = (unidadeComercial: string) => {
     this.unidadeComercial = unidadeComercial;
   };
+
+  setQuantidade = (quantidade: string) => {
+    this.quantidade = quantidade;
+  }
 
   setValorUnitarioComercial = (valorUnitarioComercial: string) => {
     this.valorUnitarioComercial = valorUnitarioComercial;
@@ -106,7 +113,7 @@ class MedicinesStore {
     this.setError(null);
 
     this.setRows([]);
-
+    console.log('filters', filters)
     try {
       const response = await this.baseService.consultarMedicamentos(
         filters,

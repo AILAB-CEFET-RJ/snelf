@@ -92,13 +92,14 @@ class MedicamentosDAO(BaseDAO):
             "clean": "clean",
             "descricaoProduto": "descricaoproduto",
             "unidadeComercial": "unidadecomercial",
+            "quantidadeComercial": "quantidadecomercial",
             "valorUnitarioComercial": "valorunitariocomercial"
         }
 
         conditions = []
         
         for attr, column in column_mapping.items():
-            filter_value = filters[attr]
+            filter_value = filters[attr]            
             if filter_value:
                 if isinstance(filter_value, str):
                     conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
@@ -124,6 +125,7 @@ class MedicamentosDAO(BaseDAO):
             "clean": f"%{clean}%" if filters["clean"] else None,
             "descricaoProduto": f"%{descricaoProduto}%" if filters["descricaoProduto"] else None,
             "unidadeComercial": filters["unidadeComercial"] if filters["unidadeComercial"] else None,
+            "quantidadecomercial": filters["quantidadeComercial"] if filters["quantidadeComercial"] else None,
             "valorUnitarioComercial": filters["valorUnitarioComercial"] if filters["valorUnitarioComercial"] else None,
             "limit": limit,
             "offset": offset
@@ -138,6 +140,7 @@ class MedicamentosDAO(BaseDAO):
             "clean": "clean",
             "descricaoProduto": "descricaoproduto",
             "unidadeComercial": "unidadecomercial",
+            "quantidade": "quantidadecomercial",
             "valorUnitarioComercial": "valorunitariocomercial"
         }
 

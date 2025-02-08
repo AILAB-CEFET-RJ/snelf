@@ -33,12 +33,10 @@ export class FoodService {
 
   async consultarAlimentos(
     filters: FilterType,
-    offset: number,
-    limit: number
   ): Promise<any> {
     try {
       const response = await this.axiosInstace.get(
-        `/alimentos/buscar-produtos?offset=${offset}&limit=${limit}`,
+        `/alimentos/buscar-produtos`,
         { params: filters }
       );
       console.log(response.data);

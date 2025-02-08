@@ -15,6 +15,7 @@ class FoodStore {
   clean: string = "";
   descricaoProduto: string = "";
   unidadeComercial: string = "";
+  quantidade: string = "";
   valorUnitarioComercial: string = "";
 
   constructor() {
@@ -30,6 +31,7 @@ class FoodStore {
       clean: observable,
       descricaoProduto: observable,
       unidadeComercial: observable,
+      quantidade: observable,
       valorUnitarioComercial: observable,
       setError: action,
       setLoading: action,
@@ -43,6 +45,7 @@ class FoodStore {
       setClean: action,
       setDescricaoProduto: action,
       setUnidadeComercial: action,
+      setQuantidade: action,
       setValorUnitarioComercial: action,
     });
 
@@ -59,6 +62,10 @@ class FoodStore {
 
   setUnidadeComercial = (unidadeComercial: string) => {
     this.unidadeComercial = unidadeComercial;
+  };
+
+  setQuantidade = (quantidade: string) => {
+    this.unidadeComercial = quantidade;
   };
 
   setValorUnitarioComercial = (valorUnitarioComercial: string) => {

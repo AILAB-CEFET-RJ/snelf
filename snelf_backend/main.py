@@ -98,12 +98,14 @@ async def obter_status_treinamento():
         return HTTPException(detail='Ocorreu um erro ao tentar obter o status do treinamento', status_code=500)
 
 @app.get("/medicamentos/buscar-produtos")
-async def search_medicines(clean, descricaoProduto, unidadeComercial, valorUnitarioComercial, offset = 0, limit = 10):
+async def search_medicines(clean, descricaoProduto, unidadeComercial, quantidade, valorUnitarioComercial, offset = 0, limit = 10):
+    print(quantidade)
     try:
         filters = {
             'clean': clean,
             'descricaoProduto': descricaoProduto, 
             'unidadeComercial': unidadeComercial, 
+            'quantidadeComercial': quantidade,
             'valorUnitarioComercial': valorUnitarioComercial, 
         }
         service = MedicamentosServico()
@@ -114,13 +116,14 @@ async def search_medicines(clean, descricaoProduto, unidadeComercial, valorUnita
         raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar consultar o clean dos medicamentos')
     
 @app.get('/medicamentos/quantidade-resgistros')
-async def total_medicamentos(clean, descricaoProduto, unidadeComercial, valorUnitarioComercial):
+async def total_medicamentos(clean, descricaoProduto, unidadeComercial, quantidade, valorUnitarioComercial):
     service = MedicamentosServico()
 
     filters = {
             'clean': clean,
             'descricaoProduto': descricaoProduto, 
             'unidadeComercial': unidadeComercial, 
+            'quantidade': quantidade,
             'valorUnitarioComercial': valorUnitarioComercial, 
         }
     
@@ -150,7 +153,7 @@ def consultar_colunas():
         print(f'ERROR :: consultar_colunas :: {error}')
         raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar obter as colunas')
 
-def load_and_filter_csv(file: str, filters: dict, offset: int, limit: int):
+def load_and_filter_csv(file: str, filters: dict):
     try:
         # Carrega o arquivo CSV
         df = pd.read_csv(file)
@@ -166,7 +169,7 @@ def load_and_filter_csv(file: str, filters: dict, offset: int, limit: int):
             df = df[df['valorUnitarioComercial'] == filters['valorUnitarioComercial']]
 
         # Aplica a paginação
-        paginated_df = df.iloc[offset:offset + limit]
+        paginated_df = df.iloc[0:]
 
         # Converte o DataFrame para uma lista de dicionários
         return paginated_df.to_dict(orient='records')
@@ -174,45 +177,49 @@ def load_and_filter_csv(file: str, filters: dict, offset: int, limit: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/suprimentos/buscar-produtos")
-async def search_supplies(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, valorUnitarioComercial: Optional[str] = None, offset: int = 0, limit: int = 10):
+async def search_supplies(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, quantidade: Optional[str] = None, valorUnitarioComercial: Optional[str] = None):
     try:
         filters = {
             'clean': clean,
             'descricaoProduto': descricaoProduto,
             'unidadeComercial': unidadeComercial,
+            'quantidade': quantidade,
             'valorUnitarioComercial': valorUnitarioComercial,
         }
-        supplies = load_and_filter_csv('produtos_informatica.csv',filters, offset, limit)
+        supplies = load_and_filter_csv('produtos_informatica.csv',filters)
+        print(len(supplies))
         return supplies
     except Exception as error:
         print(f'ERROR :: search_medicines :: {error}')
         raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar consultar os suprimentos')
     
 @app.get("/alimentos/buscar-produtos")
-async def search_food(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, valorUnitarioComercial: Optional[str] = None, offset: int = 0, limit: int = 10):
+async def search_food(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, quantidade: Optional[str] = None, valorUnitarioComercial: Optional[str] = None):
     try:
         filters = {
             'clean': clean,
             'descricaoProduto': descricaoProduto,
             'unidadeComercial': unidadeComercial,
+            'quantidade': quantidade,
             'valorUnitarioComercial': valorUnitarioComercial,
         }
-        food = load_and_filter_csv('produtos_alimenticios.csv',filters, offset, limit)
+        food = load_and_filter_csv('produtos_alimenticios.csv',filters)
         return food
     except Exception as error:
         print(f'ERROR :: search_medicines :: {error}')
         raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar consultar os alimentos')
     
 @app.get("/produtos-escolares/buscar-produtos")
-async def search_school_products(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, valorUnitarioComercial: Optional[str] = None, offset: int = 0, limit: int = 10):
+async def search_school_products(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, quantidade: Optional[str] = None, valorUnitarioComercial: Optional[str] = None):
     try:
         filters = {
             'clean': clean,
             'descricaoProduto': descricaoProduto,
             'unidadeComercial': unidadeComercial,
+            'quantidade': quantidade,
             'valorUnitarioComercial': valorUnitarioComercial,
         }
-        school_products = load_and_filter_csv('produtos_escolares.csv',filters, offset, limit)
+        school_products = load_and_filter_csv('produtos_escolares.csv',filters)
         return school_products
     except Exception as error:
         print(f'ERROR :: search_medicines :: {error}')

@@ -1,75 +1,52 @@
 import useStore from "../core/mobx/use-store";
 import { observer } from "mobx-react-lite";
-import { MedicinesFilters } from "../components/medicines-filters/medicines-filter";
-import { useEffect } from "react";
-import Table from "../components/table";
+import { MedicinesFilters } from "../components/medicines-filters/medicines-filters-mock";
+import { useEffect, useState } from "react";
+import Table from "../components/TableMock";
 
 export const SuppliesPage = observer(() => {
   const { suppliesStore } = useStore();
-  const {
-    rows,
-    columns,
-    offset,
-    limit,
-    rowsCount,
-    setOffset,
-    setLimit,
-    clean,
-    descricaoProduto,
-    unidadeComercial,
-    valorUnitarioComercial,
-  } = suppliesStore || {};
-  const transformColumn = ['Clean', 'Descricao', 'Grupo', 'Quantidade', 'Valor Unitário']
-  // Função para transformar os objetos em arrays de strings
+  const { rows } = suppliesStore || {};
+  const [filteredRows, setFilteredRows] = useState<string[][]>([]);
+  const transformColumn = ["Clean", "Descricao", "Grupo", "Quantidade", "Valor Unitário"];
+
   const transformRows = (rows: any) => {
     if (!rows || !Array.isArray(rows)) return [];
-    return rows.map(row => [
-      row.CLEAN?.toString() || "", // Exemplo de campo
-      row.DescricaoProduto  || "",           // Exemplo de campo
-      row.unidadecomercial      || "",     // Exemplo de campo
-      row.quantidadecomercial?.toString()       || "",      // Exemplo de campo
-      row.valorunitariocomercial?.toString() || "", // Exemplo de campo
-      // Adicione outros campos conforme necessário
+    return rows.map((row) => [
+      row.CLEAN?.toString() || "",
+      row.DescricaoProduto || "",
+      row.unidadecomercial || "",
+      row.quantidadecomercial?.toString() || "",
+      row.valorunitariocomercial?.toString() || "",
     ]);
   };
 
   useEffect(() => {
     const fetch = async () => {
-      await suppliesStore.loadTableRows(
-        {
-          clean: clean,
-          descricaoProduto: descricaoProduto,
-          unidadeComercial: unidadeComercial,
-          valorUnitarioComercial: valorUnitarioComercial,
-        },
-        offset,
-        limit
-      );
+      console.log("Fetching data...");
+      await suppliesStore.loadTableRows({});
+      setFilteredRows(transformRows(suppliesStore.rows));
     };
-    console.log('useEffect', rows);
-    fetch();
-  }, [
-    offset,
-    limit,
-    clean,
-    descricaoProduto,
-    unidadeComercial,
-    valorUnitarioComercial,
-  ]);
 
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setOffset(newPage * limit);
+    if (suppliesStore) {
+      fetch();
+    }
+  }, []);
+
+  // Função para aplicar os filtros localmente
+  const handleFilter = (filters: any) => {
+    const filtered = transformRows(rows).filter((row) => {
+      return (
+        (!filters.clean || (row[0] && row[0].toLowerCase().includes(filters.clean.toLowerCase()))) &&
+        (!filters.descricaoProduto || (row[1] && row[1].toLowerCase().includes(filters.descricaoProduto.toLowerCase()))) &&
+        (!filters.unidadeComercial || (row[2] && row[2].toLowerCase().includes(filters.unidadeComercial.toLowerCase()))) &&
+        (!filters.quantidade || (row[3] && parseInt(row[3]) === parseInt(filters.quantidade))) &&
+        (!filters.valorUnitarioComercial || (row[4] && parseFloat(row[4]) === parseFloat(filters.valorUnitarioComercial)))
+      );
+    });    
+    console.log(filters)
+    setFilteredRows(filtered);
   };
-
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setLimit(parseInt(event.target.value, 10));
-    setOffset(0);
-  };
-
-  // Transforma as rows antes de passar para o componente Table
-  const transformedRows = transformRows(rows);
 
   return (
     <div
@@ -85,16 +62,8 @@ export const SuppliesPage = observer(() => {
           width: "80vw",
         }}
       >
-        <MedicinesFilters />
-        <Table
-          columns={transformColumn}
-          rows={transformedRows} // Passa as rows transformadas
-          count={rowsCount}
-          offset={offset}
-          limit={limit}
-          handleChangePage={handleChangePage}
-          handleChangeRowsPerPage={handleChangeRowsPerPage}
-        />
+        <MedicinesFilters onFilter={handleFilter} />
+        <Table columns={transformColumn} rows={filteredRows} />
       </div>
     </div>
   );

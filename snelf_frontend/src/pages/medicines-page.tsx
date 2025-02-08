@@ -17,6 +17,7 @@ export const MedicinesPage = observer(() => {
     clean,
     descricaoProduto,
     unidadeComercial,
+    quantidade,
     valorUnitarioComercial,
   } = medicinesStore || {};
   useEffect(() => {
@@ -26,6 +27,7 @@ export const MedicinesPage = observer(() => {
           clean: clean,
           descricaoProduto: descricaoProduto,
           unidadeComercial: unidadeComercial,
+          quantidade: quantidade,
           valorUnitarioComercial: valorUnitarioComercial,
         },
         offset,

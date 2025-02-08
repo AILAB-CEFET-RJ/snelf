@@ -1,3 +1,4 @@
+// Table.tsx:
 import React, { useState } from "react";
 import {
   Table,
@@ -12,12 +13,8 @@ import {
 } from "@mui/material";
 
 function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
-  if (b[orderBy] < a[orderBy]) {
-    return -1;
-  }
-  if (b[orderBy] > a[orderBy]) {
-    return 1;
-  }
+  if (b[orderBy] < a[orderBy]) return -1;
+  if (b[orderBy] > a[orderBy]) return 1;
   return 0;
 }
 
@@ -35,29 +32,27 @@ function getComparator<Key extends keyof any>(
 interface TableProps {
   rows: string[][];
   columns: string[];
-  count: number | undefined;
-  handleChangePage: (_event: unknown, newPage: number) => void;
-  handleChangeRowsPerPage: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  offset: number;
-  limit: number;
 }
 
-const PaginatedTable = ({
-  rows,
-  columns,
-  count = 0,
-  offset,
-  limit,
-  handleChangePage,
-  handleChangeRowsPerPage
-}: TableProps) => {
+const PaginatedTable = ({ rows, columns }: TableProps) => {
   const [order, setOrder] = useState<Order>('asc');
   const [orderBy, setOrderBy] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const handleRequestSort = (column: string) => {
     const isAsc = orderBy === column && order === 'asc';
     setOrder(isAsc ? 'desc' : 'asc');
     setOrderBy(column);
+  };
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0); // Resetar para a primeira página ao mudar a quantidade de itens por página
   };
 
   const sortedRows = orderBy
@@ -66,6 +61,8 @@ const PaginatedTable = ({
         return getComparator(order, columnIndex)(a, b);
       })
     : rows;
+
+  const paginatedRows = sortedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <Paper sx={{ width: "100%", overflow: "hidden" }}>
@@ -87,7 +84,7 @@ const PaginatedTable = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {sortedRows.map((row, rowIndex) => (
+            {paginatedRows.map((row, rowIndex) => (
               <TableRow key={rowIndex}>
                 {row.map((field, index) => (
                   <TableCell key={index}>{field}</TableCell>
@@ -100,9 +97,9 @@ const PaginatedTable = ({
       <TablePagination
         rowsPerPageOptions={[5, 10, 25]}
         component="div"
-        count={count}
-        rowsPerPage={limit}
-        page={Math.floor(offset / limit)}
+        count={rows.length}
+        rowsPerPage={rowsPerPage}
+        page={page}
         onPageChange={handleChangePage}
         onRowsPerPageChange={handleChangeRowsPerPage}
         labelRowsPerPage="Linhas por página:"

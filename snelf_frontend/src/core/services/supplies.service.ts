@@ -34,13 +34,11 @@ export class SuppliesService {
 
   async consultarSuprimentos(
     filters: FilterType,
-    offset: number,
-    limit: number
   ): Promise<any> {
     try {
         console.log('ouuuu')
       const response = await this.axiosInstace.get(
-        `/suprimentos/buscar-produtos?offset=${offset}&limit=${limit}`,
+        `/suprimentos/buscar-produtos`,
         { params: filters }
       );
       console.log('consultarSuprimentos',response.data);
