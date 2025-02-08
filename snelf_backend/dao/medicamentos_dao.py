@@ -87,7 +87,6 @@ class MedicamentosDAO(BaseDAO):
         return self.select(query)
     
     def consultar_medicamentos_pelo_tipo_de_busca(self, filters, offset, limit):
-        
         column_mapping = {
             "clean": "clean",
             "descricaoProduto": "descricaoproduto",
@@ -96,22 +95,42 @@ class MedicamentosDAO(BaseDAO):
             "valorUnitarioComercial": "valorunitariocomercial"
         }
 
+        numeric_columns = {'quantidadecomercial', 'valorunitariocomercial'}
+        partial_match_columns = {'clean', 'descricaoproduto'}
+
         conditions = []
+        params = {}
+
         for attr, column in column_mapping.items():
-            filter_value = filters[attr]            
-            if filter_value:
-              try:
-                numeric_filter = float(filter_value)
-                conditions.append(f"t.{column} = {numeric_filter}")
-                #   if isinstance(filter_value, str):
-                #     conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
-                # else:
-                #     conditions.append(f"t.{column} = {filter_value}")
-              except:
-                conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
-        
-        condition_str = " WHERE " + " AND ".join(conditions) if conditions else ""
-        
+            filter_value = filters.get(attr)
+            if not filter_value:
+                continue  # Ignora filtros vazios
+
+            # Campos numéricos: busca exata
+            if column in numeric_columns:
+                try:
+                    numeric_value = float(filter_value)
+                    print(numeric_value)
+                    conditions.append(f"ABS(t.{column} - %({attr})s) < 0.0001")
+                    params[attr] = numeric_value
+                except ValueError:
+                    pass  # Ignora valores não numéricos
+
+            # Campos de texto
+            else:
+                if column in partial_match_columns:
+                    # Busca parcial (case-insensitive)
+                    conditions.append(f"t.{column} ILIKE %({attr})s")
+                    params[attr] = f"%{filter_value}%"
+                else:
+                    # Busca exata (case-insensitive)
+                    conditions.append(f"t.{column} ILIKE %({attr})s")
+                    params[attr] = filter_value
+
+        # Monta a cláusula WHERE
+        where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        # Query final com paginação
         query = f"""
             SELECT 
                 clean, 
@@ -120,22 +139,15 @@ class MedicamentosDAO(BaseDAO):
                 quantidadecomercial,
                 valorunitariocomercial
             FROM transactions t
-            {condition_str}
-            LIMIT {limit} OFFSET {offset}
+            {where_clause}
+            LIMIT %(limit)s OFFSET %(offset)s
         """
-        clean = filters.get("clean")
-        descricaoProduto = filters.get("descricaoProduto")
-        params = {
-            "clean": f"%{clean}%" if filters["clean"] else None,
-            "descricaoProduto": f"%{descricaoProduto}%" if filters["descricaoProduto"] else None,
-            "unidadeComercial": filters["unidadeComercial"] if filters["unidadeComercial"] else None,
-            "quantidadecomercial": filters["quantidadeComercial"] if filters["quantidadeComercial"] else None,
-            "valorUnitarioComercial": filters["valorUnitarioComercial"] if filters["valorUnitarioComercial"] else None,
+
+        # Adiciona parâmetros de paginação
+        params.update({
             "limit": limit,
             "offset": offset
-        }
-        
-        params = {key: value for key, value in params.items() if value is not None}
+        })
 
         return self.select(query, params)
     
@@ -148,28 +160,46 @@ class MedicamentosDAO(BaseDAO):
             "valorUnitarioComercial": "valorunitariocomercial"
         }
 
+        numeric_columns = {'quantidadecomercial', 'valorunitariocomercial'}
+        partial_match_columns = {'clean', 'descricaoproduto'}
+
         conditions = []
-        
+        params = {}
+
         for attr, column in column_mapping.items():
-            filter_value = filters[attr]            
-            if filter_value:
-              try:
-                numeric_filter = float(filter_value)
-                conditions.append(f"t.{column} = {numeric_filter}")
-                #   if isinstance(filter_value, str):
-                #     conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
-                # else:
-                #     conditions.append(f"t.{column} = {filter_value}")
-              except:
-                conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
+            filter_value = filters.get(attr)
+            if not filter_value:
+                continue  # Ignora filtros vazios
 
-        condition_str = " WHERE " + " AND ".join(conditions) if conditions else ""
-        
+            # Campos numéricos: busca exata
+            if column in numeric_columns:
+                try:
+                    numeric_value = float(filter_value)
+                    conditions.append(f"ABS(t.{column} - %({attr})s) < 0.0001")
+                    params[attr] = numeric_value
+                except ValueError:
+                    pass  # Ignora valores não numéricos
 
+            # Campos de texto
+            else:
+                if column in partial_match_columns:
+                    # Busca parcial (case-insensitive)
+                    conditions.append(f"t.{column} ILIKE %({attr})s")
+                    params[attr] = f"%{filter_value}%"
+                else:
+                    # Busca exata (case-insensitive)
+                    conditions.append(f"t.{column} ILIKE %({attr})s")
+                    params[attr] = filter_value
+
+        # Monta a cláusula WHERE
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+        # Query final para contar registros
         query = f"""
-            SELECT COUNT(*) as total FROM transactions t{condition_str}
+            SELECT COUNT(*) as total
+            FROM transactions t
+            {where_clause}
         """
 
-        return self.select(query);
+        return self.select(query, params);
         
-    
