@@ -97,14 +97,18 @@ class MedicamentosDAO(BaseDAO):
         }
 
         conditions = []
-        
         for attr, column in column_mapping.items():
             filter_value = filters[attr]            
             if filter_value:
-                if isinstance(filter_value, str):
-                    conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
-                else:
-                    conditions.append(f"t.{column} = {filter_value}")
+              try:
+                numeric_filter = float(filter_value)
+                conditions.append(f"t.{column} = {numeric_filter}")
+                #   if isinstance(filter_value, str):
+                #     conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
+                # else:
+                #     conditions.append(f"t.{column} = {filter_value}")
+              except:
+                conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
         
         condition_str = " WHERE " + " AND ".join(conditions) if conditions else ""
         
@@ -147,12 +151,17 @@ class MedicamentosDAO(BaseDAO):
         conditions = []
         
         for attr, column in column_mapping.items():
-            filter_value = filters[attr]
+            filter_value = filters[attr]            
             if filter_value:
-                if isinstance(filter_value, str):
-                    conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
-                else:
-                    conditions.append(f"t.{column} = {filter_value}")
+              try:
+                numeric_filter = float(filter_value)
+                conditions.append(f"t.{column} = {numeric_filter}")
+                #   if isinstance(filter_value, str):
+                #     conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
+                # else:
+                #     conditions.append(f"t.{column} = {filter_value}")
+              except:
+                conditions.append(f"LOWER(t.{column}) LIKE LOWER('{filter_value}')")
 
         condition_str = " WHERE " + " AND ".join(conditions) if conditions else ""
         

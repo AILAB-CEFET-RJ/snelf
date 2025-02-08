@@ -106,8 +106,9 @@ async def search_medicines(clean, descricaoProduto, unidadeComercial, quantidade
             'descricaoProduto': descricaoProduto, 
             'unidadeComercial': unidadeComercial, 
             'quantidadeComercial': quantidade,
-            'valorUnitarioComercial': valorUnitarioComercial, 
+            'valorUnitarioComercial': valorUnitarioComercial if valorUnitarioComercial == "" else float(valorUnitarioComercial), 
         }
+        print(filters['quantidadeComercial'], type(filters['quantidadeComercial']))
         service = MedicamentosServico()
         medicamentos = service.search_medicines(filters, offset, limit)
         return medicamentos 

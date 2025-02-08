@@ -10,6 +10,7 @@ export const MedicinesFilters = () => {
     setDescricaoProduto,
     setUnidadeComercial,
     setValorUnitarioComercial,
+    setQuantidade,
   } = medicinesStore;
   const { control, handleSubmit } = useForm<FilterType>({
     defaultValues: {
@@ -26,6 +27,7 @@ export const MedicinesFilters = () => {
     setDescricaoProduto(data.descricaoProduto);
     setUnidadeComercial(data.unidadeComercial);
     setValorUnitarioComercial(data.valorUnitarioComercial);
+    setQuantidade(data.quantidade);
     await medicinesStore.loadTableRows(data);
   };
 
