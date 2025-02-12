@@ -1,0 +1,167 @@
+import { makeObservable, observable, action, runInAction } from "mobx";
+import { FoodService } from "../../core/services/food.service";
+import { FilterType } from "../../types/types";
+
+class FoodStore {
+  rows: string[][] = [];
+  rowsCount: number | undefined;
+  isLoading: boolean = false;
+  error: string | null = null;
+  limit: number = 10;
+  offset: number = 0;
+  status: string | null = null;
+  columns: string[] = [];
+  private baseService: FoodService;
+  clean: string = "";
+  descricaoProduto: string = "";
+  unidadeComercial: string = "";
+  quantidade: string = "";
+  valorUnitarioComercial: string = "";
+
+  constructor() {
+    makeObservable(this, {
+      rows: observable,
+      rowsCount: observable,
+      isLoading: observable,
+      error: observable,
+      limit: observable,
+      offset: observable,
+      status: observable,
+      columns: observable,
+      clean: observable,
+      descricaoProduto: observable,
+      unidadeComercial: observable,
+      quantidade: observable,
+      valorUnitarioComercial: observable,
+      setError: action,
+      setLoading: action,
+      setStatus: action,
+      setRows: action,
+      setColumns: action,
+      setOffset: action,
+      setLimit: action,
+      loadTableRows: action,
+      importFoodCsv: action,
+      setClean: action,
+      setDescricaoProduto: action,
+      setUnidadeComercial: action,
+      setQuantidade: action,
+      setValorUnitarioComercial: action,
+    });
+
+    this.baseService = new FoodService();
+  }
+
+  setClean = (clean: string) => {
+    this.clean = clean;
+  };
+
+  setDescricaoProduto = (descricaoProduto: string) => {
+    this.descricaoProduto = descricaoProduto;
+  };
+
+  setUnidadeComercial = (unidadeComercial: string) => {
+    this.unidadeComercial = unidadeComercial;
+  };
+
+  setQuantidade = (quantidade: string) => {
+    this.unidadeComercial = quantidade;
+  };
+
+  setValorUnitarioComercial = (valorUnitarioComercial: string) => {
+    this.valorUnitarioComercial = valorUnitarioComercial;
+  };
+
+  setLoading = (isLoading: boolean) => {
+    this.isLoading = isLoading;
+  };
+
+  setError = (error: string | null) => {
+    this.error = error;
+  };
+
+  setStatus = (status: string | null) => {
+    this.status = status;
+  };
+
+  setRows = (rows: string[][]) => {
+    this.rows = rows;
+  };
+
+  setRowsCount = (rowsCount: number) => {
+    this.rowsCount = rowsCount;
+  };
+
+  setColumns = (nextColumns: string[]) => {
+    this.columns = nextColumns;
+  };
+
+  setOffset = (offset: number) => {
+    this.offset = offset;
+  };
+
+  setLimit = (limit: number) => {
+    this.limit = limit;
+  };
+
+  loadTableRows = async (
+    filters: FilterType,
+    offset: number = 0,
+    limit: number = 10
+  ) => {
+    this.setLoading(true);
+    this.setError(null);
+
+    this.setRows([]);
+
+    try {
+      const response = await this.baseService.consultarAlimentos(
+        filters,
+        offset,
+        limit
+      );
+    //   this.quantidadeRegistros(filters);
+      runInAction(() => {
+        this.setRows(response);
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.setError("Erro ao carregar os dados da tabela.");
+      });
+    } finally {
+      runInAction(() => {
+        this.setLoading(false);
+      });
+    }
+  };
+
+  importFoodCsv = async (csvFile: File) => {
+    this.setLoading(true);
+    this.setError(null);
+    try {
+      await this.baseService.importFile(csvFile);
+      runInAction(() => {
+        this.setStatus("CSV de medicamentos importado com sucesso.");
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.setError("Erro ao importar CSV de medicamentos.");
+      });
+    } finally {
+      runInAction(() => {
+        this.setLoading(false);
+      });
+    }
+  };
+
+  quantidadeRegistros = async (filters: FilterType) => {
+    const qtdRegistros = await this.baseService.totalRegistros(filters);
+    console.log(qtdRegistros);
+    runInAction(() => {
+      this.setRowsCount(qtdRegistros);
+    });
+    return;
+  };
+}
+
+export const foodStore = new FoodStore();

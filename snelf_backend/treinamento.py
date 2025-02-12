@@ -1,11 +1,8 @@
 import os
-import sys
 import threading
-import time
 
 from _model import treinar_modelo
 from _model.treinar_modelo import pararTreinamentoModelo
-from _pre_processamento import init_pre_processamento
 from _pre_processamento.controleDeTreinamento import ControleDeTreinamento
 
 
@@ -154,7 +151,7 @@ class _ThreadTreinamento(threading.Thread):
         try:
             localDir = str(os.path.dirname(os.path.abspath(__file__))) # fazer o projeto reconhecer o módulo em que está esse código.
             ControleDeTreinamento.running = True
-            init_pre_processamento.run(self.forceRestart)
+            #init_pre_processamento.run(self.forceRestart)
             if ControleDeTreinamento.running:
                 treinar_modelo.run(localDir)
             _ThreadTreinamento.instancias_ativas.remove(self)

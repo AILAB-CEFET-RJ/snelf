@@ -1,167 +1,230 @@
-import os
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-from http.client import HTTPException
-from fastapi import Body, FastAPI, File, UploadFile, Query, Request
-from fastapi.middleware import Middleware
-# from starlette.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from treinamento import Treinamento
+from typing import Optional, Dict
+import pandas as pd
+import uvicorn
+
+from http import HTTPStatus
+from treinamento import Treinamento 
+from modelos.http_model import HttpResponse
+from utils.files import ManipuladorDeArquivos
 from pre_processamento import inicia_pre_processamento
-import fasttext 
-from importar_csv_para_sql import fill_db_tables, insert_transactions, get_medicines_from_label, getTransactionsFromClean, get_transactions_from_product
-import pdb
-import unittest
-import numpy as np
-from fastapi.openapi.utils import get_openapi
+from servicos.fasttext import ManipuladorFasttext
+from servicos.medicamentos import MedicamentosServico
+from servicos.suprimentos import SuprimentosServico
 
-app = FastAPI(debug=True)
-treinamento = Treinamento()
 
-@app.get("/openapi.json")
-async def get_open_api_endpoint():
-    return get_openapi(title="Documentação do API", version="1.0", routes=app.routes)
+from pre_processamento import inicia_pre_processamento
 
-#rota de importação do csv. estudando como fazer para upload em csv maior
-@app.post("/importarCsv")
-async def importarCsv(csvFile: UploadFile = File(...)):
-    if csvFile.filename.endswith('.csv'):
-        #modifica o csv para formato que é aceito no treinamento
-        # cleaned_dataset = clean_dataset(csvFile)
-        #aqui seria a chamada para a api do modelo, iniciando o pré processamento
-        await inicia_pre_processamento(csvFile)
-        fasttext.supervised('dados/data.train.txt','modelo/modelo')
+import fasttext
 
-        print("Arquivo recebido na API de importação")
-        return {"filename": csvFile.filename, "status":"Arquivo recebido na API de importação"}
-    else:
-        raise HTTPException(status_code=422, detail="Formato de arquivo não suportado")
+app = FastAPI()
 
-@app.post("/treinarModelo")
-def treinamentoModelo():
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+    
+@app.post('/base/import-file')
+async def import_file(file: UploadFile = File(...)):
+    if not file:
+        raise HTTPException(status_code=400, detail='file not found')
     try:
-        fill_db_tables()
-        # await inicia_pre_processamento()
-        # fasttext.supervised('dados/data.train.txt','modelo/modelo')
-        return {"status":"Treinamento do modelo realizado com sucesso."}
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=422, detail="Modelo não pôde ser treinado.")
+        await process_file(file)
+        await inicia_pre_processamento()
+    except Exception as error:
+        print(f'ERROR :: import_file :: {error}')
+        raise HTTPException(status_code=500, detail='error occurred while trying to import file')
+    return {'text': 'file imported successfully'}
 
-@app.post("/consultarGrupo")
-async def consultaGrupo(busca: str = Body(...)):
+async def process_file(file: UploadFile):
+    file_content = await file.read()
+    product_type = 'medicamento'
+    services = {
+        'medicamento': lambda: MedicamentosServico().preencher_tabelas_medicamentos(file_content),
+        'suprimento': lambda: SuprimentosServico().inserir_suprimentos(file_content)
+    }
+    await services.get(product_type, lambda: print('No match found'))()
+
+"""
+O post abaixo é usado para iniciar ou retormar o treinamento
+- forceRestart: Indica se o treinamento deve ser reiniciado do zero (True) ou continuar de onde parou (False).
+- csv_file: Arquivo a ser enviado para gerar o modelo, se não existir, usará o que está em /dados
+"""
+@app.post("/treinamento/treinar-modelo")
+async def treinar_modelo(csv_file: Optional[UploadFile] = File(None), force_restart = False):
     try:
-        array_from_product = get_transactions_from_product(busca)
-        transactions = array_from_product
+        if csv_file is not None:
+            manipulador_de_arquivos = ManipuladorDeArquivos()
+            await manipulador_de_arquivos.escrever_dados_treinamento_txt(csv_file=csv_file)
         
-        model = fasttext.load_model("modelo/modelo.bin")
-        label = model.predict_proba([busca],k=1)[0][0][0]
+        #Descomente o trecho abaixo para treinar o modelo
+        modelo = fasttext.train_supervised('dados/data.train.txt')
+        modelo.save_model('modelos/modelo_novo.bin')
+        manipulador_fasttext = ManipuladorFasttext()
+        resposta_treinamento = manipulador_fasttext.iniciar_treinamento()
         
-        array_from_prediction = get_medicines_from_label(label)
-        # transactions = array_from_product + array_from_prediction[0:100]
+        if resposta_treinamento['erro']:
+            texto = resposta_treinamento['texto']
+            status = resposta_treinamento['status']
+            return HTTPException(detail=texto, status_code=status)
+        
+        texto = resposta_treinamento['texto']
+        status = resposta_treinamento['status']
+        return {"texto": texto, "status": status}
+    except Exception as error:
+        print(f'ERROR :: treinar_modelo :: {error}')
+        raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar iniciar o treinamento')
 
-        # print(label)
-        # print(transactions)
-        return { 'medicines': transactions }
-
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=422, detail="Consulta não pôde ser realizada.")
-
-@app.post("/consultarClean")
-async def consultaClean(busca: str = Body(...)):
+@app.get("/treinamento/parar-treinamento")
+async def parar_treinamento():
     try:
-        transactions = getTransactionsFromClean(busca)
-        print(len(transactions))
-        return { 'medicines': transactions }
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=422, detail="Consulta não pôde ser realizada.")
+        manipulador_fasttext = ManipuladorFasttext()
+        manipulador_fasttext.parar_treinamento()
+        return HttpResponse(texto='Treinamento parado.', status=HTTPStatus.OK)
+    except Exception as error:
+        print(f'ERROR :: parar_treinamento:: {error}')
+        return HTTPException(detail='Ocorreu um erro ao tentar parar o treinamento', status_code=500)
 
-# rota de importação do csv. estudando como fazer para upload em csv maior
-# @app.post("/importarMedicamentos")
-# async def importarMedicamentos(csvFile: UploadFile = File(...)):
-#     if csvFile.filename.endswith('.csv'):
-#         insert_medicine(csvFile)
-#         return {"filename": csvFile.filename, "status":"Arquivo importado com sucesso."}
-#     else:
-#         raise HTTPException(status_code=422, detail="Formato de arquivo não suportado")
-
-@app.get("/teste")
-async def root():
-    return "Teste executado com sucesso."
-
-
-#tá executando esse aqui na importação do csv
-@app.post("/importarTransacoes")
-async def importarTransacoes(csvFile: UploadFile = File(...)):
-    if csvFile.filename.endswith('.csv'):
-        insert_transactions(csvFile)
-        fill_db_tables()
-        print("Arquivo importado com sucesso.")
-        return {"filename": csvFile.filename, "status":"Arquivo importado com sucesso."}
-    else:
-        raise HTTPException(status_code=422, detail="Formato de arquivo não suportado")
-
-historico_status = []
-
-@app.post("/treinar-modelo-de-verdade")
-async def treinarModeloDeVerdade(forceRestart: bool = False):
-    """
-    Inicia/Retoma o treinamento do modelo.
-
-    :param forceRestart: Indica se o treinamento deve ser reiniciado do zero (True) ou continuar de onde parou (False).
-    :type forceRestart: bool
-    :return: Texto informativo. "Treinamento iniciado" ou  "Já existe um treinamento em andamento"
-    :rtype: str
-
-    Utiliza a função :meth:`treinamento.Treinamento.estaEmTreinamento` para verificar se existe um treinamento em andamento
-
-    Utiliza a função :meth:`treinamento.Treinamento.iniciarTreinamento` para iniciar o treinamento
-    """
-
-    localDir = os.path.dirname(os.path.abspath(__file__))
+@app.get("/treinamento/obter-status-treinamento")
+async def obter_status_treinamento():
+    treinamento = Treinamento()
     try:
         if not treinamento.estaEmTreinamento():
             treinamento.iniciarTreinamento(forceRestart=True)
-            #print(historico_status)
             return "Treinamento iniciado"
         else:
             return "Já existe um treinamento em andamento"
+    except Exception as error:
+        print(f'ERROR :: obter_status_treinamento :: {error}')
+        return HTTPException(detail='Ocorreu um erro ao tentar obter o status do treinamento', status_code=500)
 
-    except Exception as ex:
-        os.chdir(localDir)
-        raise HTTPException(status_code=422, detail=ex)
-
-
-@app.post("/parar-treinamento")
-async def pararTreinamento():
-    """
-    Para o treinamento do modelo
-
-    Utiliza a função :meth:`treinamento.Treinamento.pararTreinamento` que parar o treinamento que está em andamento
-    """
-
+@app.get("/medicamentos/buscar-produtos")
+async def search_medicines(clean, descricaoProduto, unidadeComercial, quantidade, valorUnitarioComercial, offset = 0, limit = 10):
+    print(quantidade)
     try:
-        treinamento.pararTreinamento()
-        return "Treinamento parado"
+        filters = {
+            'clean': clean,
+            'descricaoProduto': descricaoProduto, 
+            'unidadeComercial': unidadeComercial, 
+            'quantidadeComercial': quantidade,
+            'valorUnitarioComercial': valorUnitarioComercial if valorUnitarioComercial == "" else float(valorUnitarioComercial), 
+        }
+        service = MedicamentosServico()
+        medicamentos = service.search_medicines(filters, offset, limit)
+        return medicamentos 
+    except Exception as error:
+        print(f'ERROR :: search_medicines :: {error}')
+        raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar consultar o clean dos medicamentos')
+    
+@app.get('/medicamentos/quantidade-resgistros')
+async def total_medicamentos(clean, descricaoProduto, unidadeComercial, quantidade, valorUnitarioComercial):
+    service = MedicamentosServico()
 
-    except Exception as ex:
-        print(ex)
-        return
-        # raise HTTPException(ex, status_code=422, detail=ex)
-
-
-
-@app.get("/obter-status-treinamento")
-async def obterStatusTreinamento():
+    filters = {
+            'clean': clean,
+            'descricaoProduto': descricaoProduto, 
+            'unidadeComercial': unidadeComercial, 
+            'quantidade': quantidade,
+            'valorUnitarioComercial': valorUnitarioComercial, 
+        }
+    
+    registros = service.medicines_quantity(filters)
+    return registros
+    
+@app.get("/suprimentos/descricao")
+async def consultar_descricao(busca, offset = 0, limit = 10):
     try:
-        #historico_status.append(treinamento.obterStatusTreinamento())
-        return treinamento.obterStatusTreinamento()  #concatenar as linhas de "log.txt - preprocessamento" com "model.txt - treinamento" e trazer tudo pra cá e lutar para mostrar isto no front bonitinho
-    except Exception as ex:
-        raise HTTPException(status_code=422, detail=ex)
+        servico_suprimentos = SuprimentosServico()
+        suprimentos = servico_suprimentos.consultar_pela_descricao(busca, offset, limit)
+        return { suprimentos }
+    except Exception as error:
+        print(f'ERROR :: consultar_descricao :: {error}')
+        raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar consultar a descrição dos medicamentos')
+    
+@app.get("/obter-colunas")
+def consultar_colunas():
+    try:
+        return {
+            'medicamentos':  ['Clean','Descricao', 'Grupo', 'Quantidade', 'Valor Unitário'],
+            'suprimentos': ['Clean','Descricao', 'Grupo', 'Quantidade', 'Valor Unitário'],
+            'alimentos': ['Clean','Descricao', 'Grupo', 'Quantidade', 'Valor Unitário'],
+            'escolares': ['Clean','Descricao', 'Grupo', 'Quantidade', 'Valor Unitário'],
+        }
+    except Exception as error:
+        print(f'ERROR :: consultar_colunas :: {error}')
+        raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar obter as colunas')
 
+def load_and_filter_csv(file: str, filters: dict):
+    try:
+        # Carrega o arquivo CSV
+        df = pd.read_csv(file)
+        print('oi', df)
+        # Aplica os filtros
+        if filters.get('clean'):
+            df = df[df['clean'] == filters['clean']]
+        if filters.get('descricaoProduto'):
+            df = df[df['descricaoProduto'].str.contains(filters['descricaoProduto'], case=False, na=False)]
+        if filters.get('unidadeComercial'):
+            df = df[df['unidadeComercial'] == filters['unidadeComercial']]
+        if filters.get('valorUnitarioComercial'):
+            df = df[df['valorUnitarioComercial'] == filters['valorUnitarioComercial']]
 
-#burlando cors
+        # Aplica a paginação
+        paginated_df = df.iloc[0:]
+
+        # Converte o DataFrame para uma lista de dicionários
+        return paginated_df.to_dict(orient='records')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/suprimentos/buscar-produtos")
+async def search_supplies(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, quantidade: Optional[str] = None, valorUnitarioComercial: Optional[str] = None):
+    try:
+        filters = {
+            'clean': clean,
+            'descricaoProduto': descricaoProduto,
+            'unidadeComercial': unidadeComercial,
+            'quantidade': quantidade,
+            'valorUnitarioComercial': valorUnitarioComercial,
+        }
+        supplies = load_and_filter_csv('produtos_informatica.csv',filters)
+        print(len(supplies))
+        return supplies
+    except Exception as error:
+        print(f'ERROR :: search_medicines :: {error}')
+        raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar consultar os suprimentos')
+    
+@app.get("/alimentos/buscar-produtos")
+async def search_food(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, quantidade: Optional[str] = None, valorUnitarioComercial: Optional[str] = None):
+    try:
+        filters = {
+            'clean': clean,
+            'descricaoProduto': descricaoProduto,
+            'unidadeComercial': unidadeComercial,
+            'quantidade': quantidade,
+            'valorUnitarioComercial': valorUnitarioComercial,
+        }
+        food = load_and_filter_csv('produtos_alimenticios.csv',filters)
+        return food
+    except Exception as error:
+        print(f'ERROR :: search_medicines :: {error}')
+        raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar consultar os alimentos')
+    
+@app.get("/produtos-escolares/buscar-produtos")
+async def search_school_products(clean: Optional[str] = None, descricaoProduto: Optional[str] = None, unidadeComercial: Optional[str] = None, quantidade: Optional[str] = None, valorUnitarioComercial: Optional[str] = None):
+    try:
+        filters = {
+            'clean': clean,
+            'descricaoProduto': descricaoProduto,
+            'unidadeComercial': unidadeComercial,
+            'quantidade': quantidade,
+            'valorUnitarioComercial': valorUnitarioComercial,
+        }
+        school_products = load_and_filter_csv('produtos_escolares.csv',filters)
+        return school_products
+    except Exception as error:
+        print(f'ERROR :: search_medicines :: {error}')
+        raise HTTPException(status_code=500, detail='Ocorreu um erro ao tentar consultar os suprimentos')
+    
 app = CORSMiddleware(
     app=app,
     allow_origins=["*"],
